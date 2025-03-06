@@ -1,0 +1,6 @@
+﻿services:
+  translatedtemplategenerator:
+    image: sg-ttg
+    build:
+      context: .
+      dockerfile: TranslatedTemplateGenerator/Dockerfile
