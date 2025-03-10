@@ -1,0 +1,5 @@
+email_subject: "Vous avez des approbations en attente"
+email_intro: "Vous avez des approbations en attente dans le livre suivant:"
+view_approvals_btn: "Afficher la liste des approbations"
+boards_site_label: "Boards environs"
+site_name_label: "Nom de l'environnement"

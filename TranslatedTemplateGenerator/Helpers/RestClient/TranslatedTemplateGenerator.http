@@ -1,0 +1,37 @@
+@TemplateId = d-6be037d0a8cf48a58422ca4a04bec5c4
+@VersionId = ea7e6c46-83eb-41ad-a93c-6a678547ff65
+@AntiforgeryToken = CfDJ8Jl6v1I-SKxNv1Gg88p0lf_4F1JNVa-J0IQSwZYDyE3T0e6BX03a4Xa3iCzPQ7F-_UTge6t17twsvXMKyzGpocN4SY6TKHpCRl19InQpdRTmQHzQ06lL1jNS2QyzRmgxM7KTdqZFWIAfLie-rqTsQ8Q
+
+# Get template versions
+#GET {{TTG_HostAddress}}/template-versions
+#    /{{TemplateId}}
+#    ?sendGridApiKey={{SendGridApiKey}}
+
+### Get antiforgery token
+GET {{TTG_HostAddress}}/antiforgery/token
+
+### Generate translated templates
+POST {{TTG_HostAddress}}/translate
+Content-Type: multipart/form-data; boundary=boundary
+RequestVerificationToken: {{AntiforgeryToken}}
+
+--boundary
+Content-Disposition: form-data; name="sendGridApiKey"
+
+{{SendGridApiKey}}
+--boundary
+Content-Disposition: form-data; name="templateId"
+
+{{TemplateId}}
+--boundary
+Content-Disposition: form-data; name="versionId"
+
+{{VersionId}}
+--boundary
+Content-Disposition: form-data; name="files"
+Content-Type: application/json
+
+< TestAssets/en.json
+< TestAssets/de.json
+< TestAssets/fr.json
+--boundary--

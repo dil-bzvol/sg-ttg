@@ -1,44 +1,63 @@
+using System.ComponentModel.DataAnnotations;
+using Diligent.Libraries.StandardMiddleware.AspNetCore.Constants;
+using Diligent.Libraries.StandardMiddleware.AspNetCore.Middleware;
+using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.AspNetCore.Mvc;
+using NLog.Web;
+using TranslatedTemplateGenerator.Middlewares;
+using TranslatedTemplateGenerator.Models;
+using TranslatedTemplateGenerator.Services;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Logging.ClearProviders();
+builder.Host.UseNLog();
+
+builder.Services.AddScoped<ITranslationService, TranslationService>();
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddHeaderPropagation(options => { options.Headers.Add(HttpHeaders.X_CORRELATION_ID); });
+builder.Services.AddAntiforgery();
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+app.UseCorrelationId();
+app.UseErrorHandling();
 
-var summaries = new[]
+app.UseAntiforgery();
+
+app.MapGet("/antiforgery/token", (HttpContext context, [FromServices] IAntiforgery antiforgery) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var tokenSet = antiforgery.GetAndStoreTokens(context);
+    return Results.Ok(tokenSet.RequestToken);
+});
 
-app.MapGet("/weatherforecast", () =>
-    {
-        var forecast = Enumerable.Range(1, 5).Select(index =>
-                new WeatherForecast
-                (
-                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-                    Random.Shared.Next(-20, 55),
-                    summaries[Random.Shared.Next(summaries.Length)]
-                ))
-            .ToArray();
-        return forecast;
-    })
-    .WithName("GetWeatherForecast")
-    .WithOpenApi();
+app.MapPost("/translate", async (
+    [FromForm] TranslateRequest request,
+    CancellationToken cancellationToken,
+    [FromServices] ITranslationService translationService) =>
+{
+    var validationResults = new List<ValidationResult>();
+    var validationContext = new ValidationContext(request);
+    if (!Validator.TryValidateObject(request, validationContext, validationResults, true))
+        return Results.BadRequest(validationResults);
+
+    await translationService.TranslateAsync(
+        request.SendGridApiKey,
+        request.TemplateId,
+        request.VersionId,
+        request.Files,
+        cancellationToken);
+
+    return Results.Ok();
+});
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
