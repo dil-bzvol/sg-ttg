@@ -1,0 +1,96 @@
+﻿using System.Text.Json;
+using SendGrid;
+
+namespace TranslatedTemplateGenerator.Helpers;
+
+internal static class SendGridClientExtensions
+{
+    private const string DynamicTemplateGeneration = "dynamic";
+    private const string DesignEditor = "design";
+    private const string DefaultVersionName = "Default version";
+
+    private static readonly JsonSerializerOptions UploadJsonSerializerOptions =
+        new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+
+    internal static async Task<Dictionary<string, dynamic>> GetTemplateAsync(
+        this SendGridClient client,
+        string templateId,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(templateId);
+
+        var templateResponse = await client.RequestAsync(
+            BaseClient.Method.GET,
+            urlPath: $"templates/{templateId}",
+            cancellationToken: cancellationToken);
+
+        if (!templateResponse.IsSuccessStatusCode)
+            throw new InvalidOperationException("Failed to retrieve template");
+
+        var template = await templateResponse.DeserializeResponseBodyAsync();
+        if (template == null)
+            throw new InvalidOperationException("Failed to deserialize template");
+
+        return template;
+    }
+
+    internal static async Task<Dictionary<string, dynamic>> CreateTemplateAsync(
+        this SendGridClient client,
+        string name,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+
+        var response = await client.RequestAsync(
+            BaseClient.Method.POST,
+            urlPath: "templates",
+            requestBody: JsonSerializer.Serialize(new
+            {
+                Name = name,
+                Generation = DynamicTemplateGeneration,
+            }, UploadJsonSerializerOptions),
+            cancellationToken: cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException("Failed to create template");
+
+        var template = await response.DeserializeResponseBodyAsync();
+        if (template == null)
+            throw new InvalidOperationException("Failed to deserialize created template");
+
+        return template;
+    }
+    
+    internal static async Task<Dictionary<string, dynamic>> CreateTemplateVersionAsync(
+        this SendGridClient client,
+        string templateId,
+        string? name,
+        string? subject,
+        string htmlContent,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(templateId);
+        ArgumentNullException.ThrowIfNull(htmlContent);
+
+        var response = await client.RequestAsync(
+            BaseClient.Method.POST,
+            urlPath: $"templates/{templateId}/versions",
+            requestBody: JsonSerializer.Serialize(new
+            {
+                Name = name ?? DefaultVersionName,
+                Subject = subject ?? string.Empty,
+                HtmlContent = htmlContent,
+                Editor = DesignEditor
+            }, UploadJsonSerializerOptions),
+            cancellationToken: cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+            throw new InvalidOperationException("Failed to create version for template");
+
+        var templateVersion = await response.DeserializeResponseBodyAsync();
+        if (templateVersion == null)
+            throw new InvalidOperationException("Failed to deserialize created version");
+
+        return templateVersion;
+    }
+}

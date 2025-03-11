@@ -1,19 +1,21 @@
-﻿using System.Text.Json;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using Newtonsoft.Json.Linq;
 using SendGrid;
 using TranslatedTemplateGenerator.Helpers;
 
 namespace TranslatedTemplateGenerator.Services;
 
-
+/*
+ * TODO:
+ * - Store generated template IDs (e.g. in SQLite DB)
+ * - (Optionally) delete previously generated templates before uploading new ones
+ */
 
 /// <inheritdoc />
 public partial class TranslationService(ILogger<TranslationService> logger) : ITranslationService
 {
     private const string TranslationKeyPattern = @"\[{2}[ \t]*(?<tlkey>[\w-.]+)[ \t]*\]{2}";
     private const string LangCodePattern = @"([\w-.]+\.|^)(?<lang>[a-z]{2}(-[a-z]{2})?)\.\w+$";
-    private const string DefaultVersionName = "Default version";
 
     /// <inheritdoc />
     public async Task TranslateAsync(
@@ -25,140 +27,149 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
     {
         var client = new SendGridClient(sendGridApiKey);
 
-        var templateResponse = await client.RequestAsync(
-            BaseClient.Method.GET,
-            urlPath: $"templates/{templateId}",
-            cancellationToken: cancellationToken);
-
-        if (!templateResponse.IsSuccessStatusCode)
-            throw new InvalidOperationException("Failed to retrieve template");
-
-        var template = await templateResponse.DeserializeResponseBodyAsync();
+        var template = await client.GetTemplateAsync(templateId, cancellationToken);
+        var templateName = (template["name"] as string)!;
 
         var templateVersion = (template["versions"] as JArray)!
-            .FirstOrDefault(version => version["id"]?.Value<string>() == versionId);
+            .FirstOrDefault(version => version["id"]?.Value<string>() == versionId)
+            ?.ToObject<Dictionary<string, dynamic>>();
         if (templateVersion == null)
             throw new InvalidOperationException("Template version not found");
 
-        var content = templateVersion["html_content"]?.Value<string>();
+        var subject = templateVersion["subject"] as string;
+        var subjectTranslationKeys = GetSubjectTranslationKeys(subject);
+
+        var content = templateVersion["html_content"] as string;
         if (string.IsNullOrEmpty(content))
             throw new InvalidOperationException("Template version content is empty");
+        var contentTranslationKeys = GetContentTranslationKeys(content);
 
+        var translatedTemplates = await Task.WhenAll(files.Select(async (file, index) =>
+            await Translate(
+                file, index,
+                subject, subjectTranslationKeys,
+                content, contentTranslationKeys,
+                cancellationToken
+            )));
+
+        var uploads = await UploadTranslatedTemplates(client, templateName, translatedTemplates, cancellationToken);
+
+        var totalCount = uploads.Length;
+        var successCount = uploads.Count(t => t != null);
+        logger.LogInformation("Successfully uploaded {SuccessCount} out of {TotalCount} translations",
+            successCount, totalCount);
+    }
+
+    private static List<string> GetContentTranslationKeys(string content)
+    {
         var translationKeys = TranslationKeyRegex().Matches(content)
             .Select(m => m.Groups["tlkey"].Value).ToList();
+
         if (translationKeys.Count == 0)
             throw new InvalidOperationException("The template does not contain any translation keys");
 
-        var subject = templateVersion["subject"]?.Value<string>();
+        return translationKeys;
+    }
 
+    private static List<string> GetSubjectTranslationKeys(string? subject)
+    {
         var subjectTranslationKeys = new List<string>();
         if (!string.IsNullOrWhiteSpace(subject))
             subjectTranslationKeys.AddRange(TranslationKeyRegex().Matches(subject)
                 .Select(m => m.Groups["tlkey"].Value));
 
-        var translatedTemplates = new Dictionary<string, Translation>();
+        return subjectTranslationKeys;
+    }
 
-        for (var i = 0; i < files.Count; i++)
+    private static async Task<Translation> Translate(
+        IFormFile translationFile,
+        int index,
+        string? templateSubject,
+        List<string> subjectTranslationKeys,
+        string templateContent,
+        List<string> contentTranslationKeys,
+        CancellationToken cancellationToken)
+    {
+        var langCodeMatch = LangCodeRegex().Match(translationFile.FileName);
+        var id = langCodeMatch.Success
+            ? langCodeMatch.Groups["lang"].Value
+            : (index + 1).ToString();
+
+        var translations = await TranslationHelper.ParseTranslationFileAsync(translationFile, cancellationToken);
+
+        var translatedSubject = templateSubject != null
+            ? TranslateString(templateSubject, subjectTranslationKeys, translations)
+            : null;
+        var translatedContent = TranslateString(templateContent, contentTranslationKeys, translations);
+
+        return new Translation(id, translatedContent, translatedSubject);
+    }
+
+    private static string TranslateString(
+        string s,
+        List<string> translationKeys,
+        Dictionary<string, dynamic> translations)
+    {
+        foreach (var key in translationKeys)
         {
-            var file = files[i];
+            var translationValue = translations.GetTranslationForKey(key);
+            if (translationValue == null) continue;
 
-            var langCodeMatch = LangCodeRegex().Match(file.FileName);
-            var langCode = "translation " +
-                           (langCodeMatch.Success ? langCodeMatch.Groups["lang"].Value : (i + 1).ToString());
-
-            var translations = await TranslationHelper.ParseTranslationFileAsync(file, cancellationToken);
-
-            var translatedSubject = subject;
-            foreach (var key in subjectTranslationKeys)
-            {
-                var translationValue = translations.GetTranslationForKey(key);
-                if (translationValue == null)
-                {
-                    logger.LogDebug("Translation for key {Key} not found in file {FileName}", key, file.FileName);
-                    continue;
-                }
-
-                var regex = GetTranslationKeyRegexForKey(key);
-                translatedSubject = regex.Replace(translatedSubject!, translationValue);
-            }
-
-            var translatedContent = content;
-            foreach (var key in translationKeys)
-            {
-                var translationValue = translations.GetTranslationForKey(key);
-                if (translationValue == null)
-                {
-                    logger.LogDebug("Translation for key {Key} not found in file {FileName}", key, file.FileName);
-                    continue;
-                }
-
-                var regex = GetTranslationKeyRegexForKey(key);
-                translatedContent = regex.Replace(translatedContent, translationValue);
-            }
-
-            translatedTemplates.Add(langCode, new Translation(translatedContent, translatedSubject));
+            var regex = GetTranslationKeyRegexForKey(key);
+            s = regex.Replace(s, translationValue);
         }
 
-        var uploadTasks = translatedTemplates
-            .OrderBy(kvp => kvp.Key)
-            .Select(async kvp =>
-            {
-                var templateName = $"{template["name"] as string} - {kvp.Key}";
-                var templateCreationPayload = new
-                {
-                    Name = templateName,
-                    Generation = "dynamic"
-                };
-
-                var jsonSerializerOptions = new JsonSerializerOptions
-                {
-                    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-                };
-                var requestBody = JsonSerializer.Serialize(templateCreationPayload, jsonSerializerOptions);
-
-                var templateCreationResponse = client.RequestAsync(
-                    BaseClient.Method.POST,
-                    urlPath: "templates",
-                    requestBody: requestBody,
-                    cancellationToken: cancellationToken);
-
-                if (!templateCreationResponse.Result.IsSuccessStatusCode)
-                {
-                    logger.LogError("Failed to create template {TemplateName}", templateName);
-                    return false;
-                }
-
-                var createdTemplate = await templateCreationResponse.Result.DeserializeResponseBodyAsync();
-                var createdTemplateId = createdTemplate["id"] as string;
-
-                var versionCreationPayload = new
-                {
-                    Name = DefaultVersionName,
-                    HtmlContent = kvp.Value.Content,
-                    Subject = kvp.Value.Subject ?? string.Empty,
-                    Editor = "design"
-                };
-                requestBody = JsonSerializer.Serialize(versionCreationPayload, jsonSerializerOptions);
-
-                var versionCreationResponse = client.RequestAsync(
-                    BaseClient.Method.POST,
-                    urlPath: $"templates/{createdTemplateId}/versions",
-                    requestBody: requestBody,
-                    cancellationToken: cancellationToken);
-
-                if (!versionCreationResponse.Result.IsSuccessStatusCode)
-                    logger.LogError("Failed to create version for template {TemplateName}", templateName);
-
-                return versionCreationResponse.Result.IsSuccessStatusCode;
-            }).ToList();
-
-        await Task.WhenAll(uploadTasks);
-
-        var totalCount = uploadTasks.Count;
-        var successCount = uploadTasks.Count(t => t.Result);
-        logger.LogInformation("Successfully uploaded {SuccessCount} out of {TotalCount} translations",
-            successCount, totalCount);
+        return s;
     }
+
+    private static Task<Translation[]> TranslateTemplates(
+        IFormFileCollection files,
+        string templateSubject,
+        List<string> subjectTranslationKeys,
+        string templateContent,
+        List<string> contentTranslationKeys,
+        CancellationToken cancellationToken) =>
+        Task.WhenAll(files.Select((file, index) =>
+            Translate(
+                file, index,
+                templateSubject, subjectTranslationKeys,
+                templateContent, contentTranslationKeys,
+                cancellationToken
+            )));
+
+    private static async Task<string?> UploadTranslatedTemplate(
+        SendGridClient client,
+        string templateName,
+        Translation translation,
+        CancellationToken cancellationToken)
+    {
+        var newTemplateName = $"{templateName} - translation {translation.Id}";
+
+        try
+        {
+            var createdTemplate = await client.CreateTemplateAsync(newTemplateName, cancellationToken);
+            var createdTemplateId = (createdTemplate["id"] as string)!;
+
+            await client.CreateTemplateVersionAsync(
+                createdTemplateId, null, translation.Subject, translation.Content, cancellationToken);
+
+            return createdTemplateId;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    private static Task<string?[]> UploadTranslatedTemplates(
+        SendGridClient client,
+        string templateName,
+        Translation[] translatedTemplates,
+        CancellationToken cancellationToken) =>
+        Task.WhenAll(translatedTemplates
+            .OrderBy(translation => translation.Id)
+            .Select(translation => UploadTranslatedTemplate(client, templateName, translation, cancellationToken))
+        );
 
     private static Regex GetTranslationKeyRegexForKey(string key) =>
         new(@"\[{2}[ \t]*"
@@ -171,5 +182,5 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
     [GeneratedRegex(LangCodePattern, RegexOptions.Compiled | RegexOptions.IgnoreCase)]
     private static partial Regex LangCodeRegex();
 
-    private record Translation(string Content, string? Subject);
+    private record Translation(string Id, string Content, string? Subject);
 }

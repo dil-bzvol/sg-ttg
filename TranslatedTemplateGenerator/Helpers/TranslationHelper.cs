@@ -6,7 +6,7 @@ namespace TranslatedTemplateGenerator.Helpers;
 /// <summary>
 /// Provides helper methods for translation files.
 /// </summary>
-public static class TranslationHelper
+internal static class TranslationHelper
 {
     /// <summary>
     /// Parses the translation file asynchronously.
@@ -15,7 +15,7 @@ public static class TranslationHelper
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The parsed translation dictionary.</returns>
     /// <exception cref="InvalidOperationException">The translation file extension is not supported.</exception>
-    public static async Task<Dictionary<string, dynamic>> ParseTranslationFileAsync(
+    internal static async Task<Dictionary<string, dynamic>> ParseTranslationFileAsync(
         IFormFile file, CancellationToken cancellationToken)
     {
         await using var stream = file.OpenReadStream();
@@ -42,7 +42,7 @@ public static class TranslationHelper
 /// <summary>
 /// Provides extension methods for translation dictionaries.
 /// </summary>
-public static class TranslationDictionaryExtensions
+internal static class TranslationDictionaryExtensions
 {
     /// <summary>
     /// Gets the translation value for the given key.
@@ -54,7 +54,7 @@ public static class TranslationDictionaryExtensions
     /// <paramref name="translations"/> is <see langword="null"/>, or
     /// <paramref name="key"/> is <see langword="null"/> or empty.
     /// </exception>
-    public static string? GetTranslationForKey(this Dictionary<string, dynamic>? translations, string key)
+    internal static string? GetTranslationForKey(this Dictionary<string, dynamic>? translations, string key)
     {
         ArgumentNullException.ThrowIfNull(translations);
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
