@@ -37,7 +37,7 @@ app.UseAntiforgery();
 app.MapGet("/antiforgery/token", (HttpContext context, [FromServices] IAntiforgery antiforgery) =>
 {
     var tokenSet = antiforgery.GetAndStoreTokens(context);
-    return Results.Ok(tokenSet.RequestToken);
+    return Results.Ok(new { Token = tokenSet.RequestToken });
 });
 
 app.MapPost("/translate", async (
