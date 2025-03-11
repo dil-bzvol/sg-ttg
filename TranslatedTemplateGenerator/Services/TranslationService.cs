@@ -161,7 +161,9 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
     }
 
     private static Regex GetTranslationKeyRegexForKey(string key) =>
-        new(@"\[{2}[ \t]*" + key + @"[ \t]*\]{2}", RegexOptions.IgnoreCase);
+        new(@"\[{2}[ \t]*"
+            + key.Replace(".", @"\.")
+            + @"[ \t]*\]{2}", RegexOptions.IgnoreCase);
 
     [GeneratedRegex(TranslationKeyPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase)]
     private static partial Regex TranslationKeyRegex();
