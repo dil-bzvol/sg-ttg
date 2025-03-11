@@ -14,10 +14,13 @@ internal static class TranslationHelper
     /// <param name="file">The translation file.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The parsed translation dictionary.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="file"/> is <see langword="null"/>.</exception>
     /// <exception cref="InvalidOperationException">The translation file extension is not supported.</exception>
     internal static async Task<Dictionary<string, dynamic>> ParseTranslationFileAsync(
         IFormFile file, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(file);
+        
         await using var stream = file.OpenReadStream();
         using var reader = new StreamReader(stream);
         
