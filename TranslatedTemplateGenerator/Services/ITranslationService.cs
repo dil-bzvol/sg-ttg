@@ -13,8 +13,8 @@ public interface ITranslationService
     /// <param name="versionId">The ID of the template version to translate.</param>
     /// <param name="files">The translation files.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>A task that represents the asynchronous translation operation.</returns>
-    public Task TranslateAsync(
+    /// <returns>The generated templates' IDs.</returns>
+    public Task<string[]> TranslateAsync(
         string sendGridApiKey,
         string templateId,
         string versionId,

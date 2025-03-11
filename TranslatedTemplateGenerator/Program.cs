@@ -50,14 +50,14 @@ app.MapPost("/translate", async (
     if (!Validator.TryValidateObject(request, validationContext, validationResults, true))
         return Results.BadRequest(validationResults);
 
-    await translationService.TranslateAsync(
+    var generatedTemplateIds = await translationService.TranslateAsync(
         request.SendGridApiKey,
         request.TemplateId,
         request.VersionId,
         request.Files,
         cancellationToken);
 
-    return Results.Ok();
+    return Results.Ok(new TranslateResponse { GeneratedTemplates = generatedTemplateIds });
 });
 
 app.Run();

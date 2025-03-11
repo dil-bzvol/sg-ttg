@@ -18,7 +18,7 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
     private const string LangCodePattern = @"([\w-.]+\.|^)(?<lang>[a-z]{2}(-[a-z]{2})?)\.\w+$";
 
     /// <inheritdoc />
-    public async Task TranslateAsync(
+    public async Task<string[]> TranslateAsync(
         string sendGridApiKey,
         string templateId,
         string versionId,
@@ -54,10 +54,11 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
 
         var uploads = await UploadTranslatedTemplates(client, templateName, translatedTemplates, cancellationToken);
 
-        var totalCount = uploads.Length;
-        var successCount = uploads.Count(t => t != null);
+        string[] createdIds = uploads.Where(t => t != null).ToArray()!;
         logger.LogInformation("Successfully uploaded {SuccessCount} out of {TotalCount} translations",
-            successCount, totalCount);
+            createdIds.Length, uploads.Length);
+        
+        return createdIds;
     }
 
     private static List<string> GetContentTranslationKeys(string content)
