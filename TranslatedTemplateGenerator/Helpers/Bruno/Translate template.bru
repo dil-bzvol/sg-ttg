@@ -1,0 +1,27 @@
+meta {
+  name: Translate template
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{TTG_HostAddress}}/translate
+  body: multipartForm
+  auth: none
+}
+
+headers {
+  RequestVerificationToken: {{AntiforgeryToken}}
+}
+
+body:multipart-form {
+  sendGridApiKey: {{SendGridApiKey}}
+  templateId: {{TemplateId}}
+  versionId: {{VersionId}}
+  files: @file(C:\Users\bzvolenszki\code\sg-ttg\TranslatedTemplateGenerator\Helpers\RestClient\TestAssets\de.json|C:\Users\bzvolenszki\code\sg-ttg\TranslatedTemplateGenerator\Helpers\RestClient\TestAssets\en.json|C:\Users\bzvolenszki\code\sg-ttg\TranslatedTemplateGenerator\Helpers\RestClient\TestAssets\fr.yml) @contentType(application/json)
+}
+
+vars:pre-request {
+  TemplateId: 
+  VersionId: 
+}

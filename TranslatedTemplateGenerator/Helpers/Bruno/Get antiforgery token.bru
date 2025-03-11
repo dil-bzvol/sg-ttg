@@ -1,0 +1,15 @@
+meta {
+  name: Get antiforgery token
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{TTG_HostAddress}}/antiforgery/token
+  body: none
+  auth: none
+}
+
+script:post-response {
+  bru.setEnvVar("AntiforgeryToken", res.body.token);
+}

@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "SG-TTG",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
