@@ -16,6 +16,7 @@ builder.Services.AddScoped<ITranslationService, TranslationService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddHeaderPropagation();
 builder.Services.AddAntiforgery();
 
 var app = builder.Build();
