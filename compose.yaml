@@ -1,6 +1,8 @@
 ﻿services:
-  translatedtemplategenerator:
+  translated_template_generator:
     image: sg-ttg
     build:
       context: .
       dockerfile: TranslatedTemplateGenerator/Dockerfile
+    ports:
+      - "5555:8080"

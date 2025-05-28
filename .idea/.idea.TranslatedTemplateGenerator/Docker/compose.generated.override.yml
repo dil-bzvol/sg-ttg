@@ -1,0 +1,21 @@
+# This is a generated file. Not intended for manual editing.
+services:
+  translated_template_generator:
+    build:
+      context: "C:\\Users\\bzvolenszki\\code\\sg-ttg"
+      dockerfile: "TranslatedTemplateGenerator/Dockerfile"
+      target: "base"
+    command: []
+    entrypoint:
+    - "dotnet"
+    - "/app/bin/Debug/net8.0/TranslatedTemplateGenerator.dll"
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Development"
+      DOTNET_USE_POLLING_FILE_WATCHER: "true"
+    image: "sg-ttg:dev"
+    ports: []
+    volumes:
+    - "C:\\Users\\bzvolenszki\\code\\sg-ttg\\TranslatedTemplateGenerator:/app:rw"
+    - "C:\\Users\\bzvolenszki\\code\\sg-ttg:/src:rw"
+    - "C:\\Users\\bzvolenszki\\.nuget\\packages:/root/.nuget/packages"
+    working_dir: "/app"
