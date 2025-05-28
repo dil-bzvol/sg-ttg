@@ -18,7 +18,7 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
     private const string LangCodePattern = @"([\w-.]+\.|^)(?<lang>[a-z]{2}(-[a-z]{2})?)\.\w+$";
 
     /// <inheritdoc />
-    public async Task<string[]> TranslateAsync(
+    public async Task<Dictionary<string, string?>> TranslateAsync(
         string sendGridApiKey,
         string templateId,
         string versionId,
@@ -44,21 +44,20 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
             throw new InvalidOperationException("Template version content is empty");
         var contentTranslationKeys = GetContentTranslationKeys(content);
 
-        var translatedTemplates = await Task.WhenAll(files.Select(async (file, index) =>
-            await Translate(
-                file, index,
-                subject, subjectTranslationKeys,
-                content, contentTranslationKeys,
-                cancellationToken
-            )));
+        var translatedTemplates = await TranslateTemplates(
+            files,
+            subject, subjectTranslationKeys,
+            content, contentTranslationKeys,
+            cancellationToken
+        );
 
         var uploads = await UploadTranslatedTemplates(client, templateName, translatedTemplates, cancellationToken);
 
-        string[] createdIds = uploads.Where(t => t != null).ToArray()!;
+        var successCount = uploads.Count(upload => upload.Value != null);
         logger.LogInformation("Successfully uploaded {SuccessCount} out of {TotalCount} translations",
-            createdIds.Length, uploads.Length);
-        
-        return createdIds;
+            successCount, uploads.Count);
+
+        return uploads;
     }
 
     private static List<string> GetContentTranslationKeys(string content)
@@ -125,7 +124,7 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
 
     private static Task<Translation[]> TranslateTemplates(
         IFormFileCollection files,
-        string templateSubject,
+        string? templateSubject,
         List<string> subjectTranslationKeys,
         string templateContent,
         List<string> contentTranslationKeys,
@@ -162,15 +161,24 @@ public partial class TranslationService(ILogger<TranslationService> logger) : IT
         }
     }
 
-    private static Task<string?[]> UploadTranslatedTemplates(
+    private static async Task<Dictionary<string, string?>> UploadTranslatedTemplates(
         SendGridClient client,
         string templateName,
         Translation[] translatedTemplates,
-        CancellationToken cancellationToken) =>
-        Task.WhenAll(translatedTemplates
-            .OrderBy(translation => translation.Id)
-            .Select(translation => UploadTranslatedTemplate(client, templateName, translation, cancellationToken))
+        CancellationToken cancellationToken)
+    {
+        var uploads = await Task.WhenAll(
+            translatedTemplates
+                .OrderBy(translation => translation.Id)
+                .Select(async translation =>
+                {
+                    var upload = await UploadTranslatedTemplate(client, templateName, translation, cancellationToken);
+                    return new KeyValuePair<string, string?>(translation.Id, upload);
+                })
         );
+
+        return new Dictionary<string, string?>(uploads);
+    }
 
     private static Regex GetTranslationKeyRegexForKey(string key) =>
         new(@"\[{2}[ \t]*"

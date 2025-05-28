@@ -6,7 +6,7 @@
 public record TranslateResponse
 {
     /// <summary>
-    /// The generated templates' IDs.
+    /// A dictionary containing pairs of translation IDs and their corresponding generated template IDs.
     /// </summary>
-    public string[] GeneratedTemplates { get; init; }
+    public required Dictionary<string, string?> GeneratedTemplates { get; init; }
 }
