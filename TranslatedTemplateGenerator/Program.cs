@@ -1,6 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using Diligent.Libraries.StandardMiddleware.AspNetCore.Constants;
-using Diligent.Libraries.StandardMiddleware.AspNetCore.Middleware;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using NLog.Web;
@@ -18,7 +16,6 @@ builder.Services.AddScoped<ITranslationService, TranslationService>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddHeaderPropagation(options => { options.Headers.Add(HttpHeaders.X_CORRELATION_ID); });
 builder.Services.AddAntiforgery();
 
 var app = builder.Build();
@@ -29,7 +26,6 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseCorrelationId();
 app.UseErrorHandling();
 
 app.UseAntiforgery();

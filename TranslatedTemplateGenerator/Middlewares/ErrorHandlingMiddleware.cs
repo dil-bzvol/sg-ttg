@@ -1,6 +1,5 @@
 ﻿using System.Net;
 using System.Text;
-using Diligent.Libraries.StandardMiddleware.AspNetCore.Constants;
 using Microsoft.AspNetCore.HeaderPropagation;
 using Microsoft.Extensions.Primitives;
 
@@ -30,7 +29,8 @@ internal class ErrorHandlingMiddleware(
         var headers = headerPropagationValues.Headers ??=
             new Dictionary<string, StringValues>(StringComparer.OrdinalIgnoreCase);
 
-        if (!headers.TryGetValue(HttpHeaders.X_CORRELATION_ID, out var correlationId))
+        const string correlationIdHeader = "X-Correlation-ID";
+        if (!headers.TryGetValue(correlationIdHeader, out var correlationId))
             correlationId = Guid.NewGuid().ToString();
 
         return new DetailedErrorMessage
