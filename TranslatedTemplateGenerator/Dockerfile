@@ -1,4 +1,5 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+LABEL org.opencontainers.image.source = "https://github.com/dil-bzvol/sg-ttg"
 WORKDIR /app
 EXPOSE 8080
 
