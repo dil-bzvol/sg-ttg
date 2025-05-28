@@ -1,6 +1,7 @@
 ﻿name: Build and Publish Docker image to GHCR
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
 
@@ -26,7 +27,7 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker-compose build -t ghcr.io/${{ github.repository_owner }}/sg-ttg:latest .
+          docker build -f "TranslatedTemplateGenerator/Dockerfile" -t ghcr.io/${{ github.repository_owner }}/sg-ttg:latest .
 
       - name: Push Docker image
         run: |
