@@ -1,4 +1,10 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+
+LABEL org.opencontainers.image.title = "Translated Template Generator"
+LABEL org.opencontainers.image.source = "https://github.com/dil-bzvol/sg-ttg"
+LABEL org.opencontainers.image.authors = "Benjamin Zvolenszki <zvolenszki.benjamin@gmail.com>"
+LABEL org.opencontainers.image.licenses = "MIT"
+
 WORKDIR /app
 EXPOSE 8080
 
